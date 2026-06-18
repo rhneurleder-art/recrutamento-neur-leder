@@ -306,43 +306,64 @@ function renderVagas() {
 function usarNaAnalise(id) { document.getElementById('sel-vaga').value = id; onVagaChange(); setTab('analise'); }
 
 // ── RESPOSTAS ─────────────────────────────────────────────────────
-function renderRespostas() {
+var _respostasCache = [];
+
+async function renderRespostas() {
   const el = document.getElementById('respostas-lista');
-  let respostas = []; try { respostas = JSON.parse(localStorage.getItem(RESP_KEY) || '[]'); } catch(e) {}
-  if (!respostas.length) { el.innerHTML = '<div class="empty-state"><i class="ti ti-inbox-off"></i><p>Nenhuma resposta recebida ainda.</p></div>'; return; }
-  el.innerHTML = respostas.slice().reverse().map(function(r) {
+  el.innerHTML = '<div class="empty-state"><i class="ti ti-loader" style="animation:spin 1s linear infinite"></i><p>Carregando respostas...</p></div>';
+  try {
+    const res = await fetch('https://sheetdb.io/api/v1/76l7sk1pdqz9g?sheet=candidatos');
+    const data = await res.json();
+    _respostasCache = Array.isArray(data) ? data : [];
+  } catch(e) {
+    _respostasCache = [];
+  }
+  if (!_respostasCache.length) {
+    el.innerHTML = '<div class="empty-state"><i class="ti ti-inbox-off"></i><p>Nenhuma resposta recebida ainda.</p></div>';
+    return;
+  }
+  el.innerHTML = _respostasCache.slice().reverse().map(function(r, i) {
+    var idx = _respostasCache.length - 1 - i;
     return '<div class="resp-card">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
-        '<div><h3>'+(r.respostas.nome||'Candidato sem nome')+'</h3><p>'+r.vagaCargo+' · '+r.data+'</p></div>' +
+        '<div><h3>'+(r.nome||'Candidato sem nome')+'</h3><p>'+(r.vaga||'—')+' · '+(r.data||'—')+'</p></div>' +
         '<div style="display:flex;gap:6px">' +
-          '<button class="btn btn-primary btn-sm" onclick="analisarResposta(&quot;'+r.id+'&quot;)"><i class="ti ti-sparkles"></i> Analisar</button>' +
-          '<button class="btn btn-sec btn-sm" onclick="verResposta(&quot;'+r.id+'&quot;)"><i class="ti ti-eye"></i></button>' +
+          '<button class="btn btn-primary btn-sm" onclick="analisarResposta('+idx+')"><i class="ti ti-sparkles"></i> Analisar</button>' +
+          '<button class="btn btn-sec btn-sm" onclick="verResposta('+idx+')"><i class="ti ti-eye"></i></button>' +
         '</div>' +
       '</div></div>';
   }).join('');
 }
-function limparRespostas() { if (!confirm('Apagar todas as respostas?')) return; localStorage.removeItem(RESP_KEY); renderRespostas(); }
-function verResposta(id) {
-  let respostas = []; try { respostas = JSON.parse(localStorage.getItem(RESP_KEY) || '[]'); } catch(e) {}
-  const r = respostas.find(x => x.id === id); if (!r) return;
-  alert(Object.entries(r.respostas).map(function(e){ return e[0]+': '+e[1]; }).join('\n'));
+
+function limparRespostas() {
+  if (!confirm('Apagar todas as respostas locais?')) return;
+  localStorage.removeItem(RESP_KEY);
+  renderRespostas();
 }
-function analisarResposta(id) {
-  let respostas = []; try { respostas = JSON.parse(localStorage.getItem(RESP_KEY) || '[]'); } catch(e) {}
-  const entry = respostas.find(x => x.id === id); if (!entry) return;
-  document.getElementById('sel-vaga').value = entry.vagaId; onVagaChange();
-  const r = entry.respostas;
-  const vagaObj = vagas.find(x => x.id === entry.vagaId);
+
+function verResposta(idx) {
+  const r = _respostasCache.slice().reverse()[idx];
+  if (!r) return;
+  var texto = Object.entries(r).map(function(e){ return e[0]+': '+e[1]; }).join('\n');
+  alert(texto);
+}
+
+function analisarResposta(idx) {
+  const r = _respostasCache.slice().reverse()[idx];
+  if (!r) return;
+  // Encontrar vaga pelo nome
+  const vagaObj = vagas.find(function(v){ return v.cargo === (r.vaga||'').split(' — ')[0]; });
+  if (vagaObj) { document.getElementById('sel-vaga').value = vagaObj.id; onVagaChange(); }
   const linhas = [
-    'NOME: ' + (r.nome || 'Não informado'),
-    'LOCALIDADE: ' + (r.local || '—') + ' | TELEFONE: ' + (r.fone || '—') + ' | PRETENSÃO: ' + (r.salario || '—'),
-    '', 'DISPONIBILIDADE: ' + (r._dispon || '—'),
-    '', 'EXPERIÊNCIA:', r._exp || '—',
-    '', 'MOTIVAÇÃO:', r._motivo || '—',
+    'NOME: ' + (r.nome || '—'),
+    'LOCALIDADE: ' + (r.local || '—') + ' | TELEFONE: ' + (r.telefone || '—') + ' | PRETENSÃO: ' + (r.salario || '—'),
+    '', 'DISPONIBILIDADE: ' + (r.disponibilidade || '—'),
+    '', 'EXPERIÊNCIA:', r.experiencia || '—',
+    '', 'MOTIVAÇÃO:', r.motivacao || '—',
   ];
   if (r.disc && r.disc !== 'Não informado') { linhas.push('', '=== PERFIL DISC ===', 'PERFIL DISC: ' + r.disc, '=================='); }
-  if (r.curriculo_nome) { linhas.push('', 'CURRÍCULO ANEXADO: ' + r.curriculo_nome); }
-  if (vagaObj && vagaObj.perguntas) { vagaObj.perguntas.forEach((p, i) => { linhas.push('', 'PERGUNTA: ' + p, r['_vaga_' + i] || '—'); }); }
+  if (r.curriculo && r.curriculo !== 'Não enviado') { linhas.push('', 'CURRÍCULO: ' + r.curriculo); }
+  if (r.respostas_especificas) { linhas.push('', 'RESPOSTAS ESPECÍFICAS:', r.respostas_especificas); }
   document.getElementById('curriculo').value = linhas.join('\n');
   setTab('analise');
 }
