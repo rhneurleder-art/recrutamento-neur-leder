@@ -312,10 +312,12 @@ async function renderRespostas() {
   const el = document.getElementById('respostas-lista');
   el.innerHTML = '<div class="empty-state"><i class="ti ti-loader" style="animation:spin 1s linear infinite"></i><p>Carregando respostas...</p></div>';
   try {
-    const res = await fetch('https://sheetdb.io/api/v1/76l7sk1pdqz9g?sheet=candidatos');
+    const res = await fetch('https://sheetdb.io/api/v1/76l7sk1pdqz9g?sheet=candidatos', { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' });
     const data = await res.json();
+    console.log('Respostas recebidas:', data.length, JSON.stringify(data[0]).substring(0,100));
     _respostasCache = Array.isArray(data) ? data : [];
   } catch(e) {
+    console.log('Erro ao buscar respostas:', e);
     _respostasCache = [];
   }
   if (!_respostasCache.length) {

@@ -208,7 +208,7 @@ async function loadVagas(){
   const sel=document.getElementById('sel-vaga');
   sel.innerHTML='<option value="">Carregando vagas...</option>';
   try{
-    const res = await fetch('https://sheetdb.io/api/v1/76l7sk1pdqz9g?sheet=vagas');
+    const res = await fetch('https://sheetdb.io/api/v1/76l7sk1pdqz9g?sheet=vagas', { method: 'GET', headers: { 'Accept': 'application/json' }, mode: 'cors' });
     const data = await res.json();
     console.log('SheetDB resposta:', JSON.stringify(data).substring(0,300));
     vagas = data.map(function(row) {
