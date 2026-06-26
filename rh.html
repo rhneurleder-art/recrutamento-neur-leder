@@ -363,7 +363,13 @@ function analisarResposta(idx) {
     '', 'EXPERIÊNCIA:', r.experiencia || '—',
     '', 'MOTIVAÇÃO:', r.motivacao || '—',
   ];
-  if (r.disc && r.disc !== 'Não informado') { linhas.push('', '=== PERFIL DISC ===', 'PERFIL DISC: ' + r.disc, '=================='); }
+  if (r.disc && r.disc !== 'Não informado') {
+    linhas.push('');
+    linhas.push('========================================');
+    linhas.push('PERFIL DISC DO CANDIDATO (OBRIGATÓRIO ANALISAR):');
+    linhas.push(r.disc);
+    linhas.push('========================================');
+  }
   if (r.curriculo && r.curriculo !== 'Não enviado') { linhas.push('', 'CURRÍCULO: ' + r.curriculo); }
   if (r.respostas_especificas) { linhas.push('', 'RESPOSTAS ESPECÍFICAS:', r.respostas_especificas); }
   document.getElementById('curriculo').value = linhas.join('\n');
@@ -452,7 +458,12 @@ Competências comportamentais: ${(v.compComp||[]).join(', ')||'Não informadas'}
 DADOS DO CANDIDATO:
 ${curriculo}
 
-IMPORTANTE — DISC: Se nos dados do candidato houver uma linha começando com "PERFIL DISC:" contendo valores D/I/S/C, obrigatoriamente analise e inclua o campo disc_analise no JSON explicando o perfil e o alinhamento com as competências comportamentais da vaga. Se não houver dados DISC, coloque "Não informado" no campo disc_analise.
+IMPORTANTE — DISC: Os dados do candidato podem conter uma seção marcada com "PERFIL DISC DO CANDIDATO". Se encontrar essa seção, você DEVE obrigatoriamente:
+1. Analisar os percentuais D, I, S, C
+2. Identificar o perfil dominante
+3. Avaliar o alinhamento com as competências comportamentais da vaga
+4. Incluir essa análise no campo disc_analise do JSON
+Se não houver dados DISC, coloque "Não informado" no campo disc_analise.
 
 Responda APENAS com JSON válido, sem markdown, sem backticks:
 {"score":75,"classificacao":"Boa aderência","resumo":"Resumo em até 5 linhas.","calculo":"Breve explicação.","disc_analise":"Análise do perfil DISC em 2 linhas (ou 'Não informado' se ausente).","criterios":[{"nome":"Experiência profissional","nivel":"Alta","evidencia":"..."},{"nome":"Formação acadêmica","nivel":"Média","evidencia":"..."},{"nome":"Competências técnicas","nivel":"Baixa","evidencia":"..."},{"nome":"Competências comportamentais","nivel":"Alta","evidencia":"..."},{"nome":"Perfil DISC","nivel":"Alta","evidencia":"..."},{"nome":"Potencial de desenvolvimento","nivel":"Média","evidencia":"..."}],"requisitos":[{"nome":"Requisito","atende":"Sim","evidencia":"..."}],"pontos_fortes":["Ponto 1","Ponto 2","Ponto 3"],"pontos_atencao":["Ponto 1","Ponto 2"],"perguntas":["Pergunta 1?","Pergunta 2?","Pergunta 3?"],"recomendacao":"Avançar para a próxima etapa","justificativa":"Justificativa em até 5 linhas."}
