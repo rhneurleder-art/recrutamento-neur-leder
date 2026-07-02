@@ -6,6 +6,7 @@
 <title>Painel RH — Neur Leder</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -539,7 +540,10 @@ function renderResultado(r, cargo) {
   document.getElementById('a-resultado').innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;flex-wrap:wrap;gap:8px">' +
       '<div><p style="font-size:12px;color:var(--text3)">' + cargo + '</p><p style="font-size:18px;font-weight:600">Resultado da análise</p></div>' +
+      '<div style="display:flex;gap:8px">' +
       '<button class="btn btn-sec btn-sm" onclick="novaAnalise()"><i class="ti ti-refresh"></i> Nova</button>' +
+      '<button class="btn btn-primary btn-sm" onclick="exportarPDF()"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>' +
+    '</div>' +
     '</div>' +
     '<div class="card score-row">' +
       '<div style="text-align:center;min-width:110px"><div class="score-big" style="color:' + scol(r.score) + '">' + r.score + '%</div><span class="badge ' + sc(r.score) + '" style="margin-top:6px">' + r.classificacao + '</span></div>' +
@@ -560,6 +564,8 @@ function renderResultado(r, cargo) {
       '<div style="margin-top:1rem;padding:10px 12px;background:var(--bg2);border-radius:var(--r)"><p style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">Cálculo:</strong> ' + r.calculo + '</p></div>' +
     '</div>';
 
+  window._lastResultado = r;
+  window._lastCargo = cargo;
   document.getElementById('a-resultado').style.display = 'block';
 }
 
@@ -590,6 +596,210 @@ async function sincVagasSheets() {
   } catch(e) {
     console.warn('Erro ao sincronizar vagas:', e);
   }
+}
+
+function exportarPDF() {
+  var { jsPDF } = window.jspdf;
+  var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  var r = window._lastResultado;
+  if (!r) { alert('Gere uma análise primeiro.'); return; }
+
+  var cargo = window._lastCargo || '';
+  var pageW = 210, margin = 15, contentW = pageW - margin * 2;
+  var y = margin;
+  var bronze = [200, 122, 40];
+  var dark = [26, 26, 26];
+  var gray = [100, 80, 60];
+  var light = [240, 230, 214];
+
+  function checkPage(h) {
+    if (y + h > 280) { doc.addPage(); y = margin; }
+  }
+
+  function sectionTitle(txt) {
+    checkPage(10);
+    doc.setFillColor(42, 26, 10);
+    doc.roundedRect(margin, y, contentW, 8, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...bronze);
+    doc.text(txt.toUpperCase(), margin + 3, y + 5.5);
+    y += 12;
+  }
+
+  function text(txt, size, color, bold, indent) {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size || 10);
+    doc.setTextColor(...(color || dark));
+    var lines = doc.splitTextToSize(txt, contentW - (indent || 0));
+    checkPage(lines.length * (size || 10) * 0.5 + 2);
+    doc.text(lines, margin + (indent || 0), y);
+    y += lines.length * (size || 10) * 0.45 + 2;
+  }
+
+  function badge(txt, x, yb, color) {
+    doc.setFillColor(...color);
+    doc.roundedRect(x, yb - 4, doc.getTextWidth(txt) + 6, 6, 1, 1, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(txt, x + 3, yb);
+  }
+
+  function scoreColor(s) { return s>=90?[15,110,86]:s>=75?[24,95,165]:s>=60?[133,79,11]:[160,64,64]; }
+  function nivelColor(n) { return n==='Alta'?[15,110,86]:n==='Média'?[133,79,11]:n==='Baixa'?[160,64,64]:[83,74,183]; }
+  function atendeColor(a) { return a==='Sim'?[15,110,86]:a==='Parcialmente'?[133,79,11]:[160,64,64]; }
+
+  // ── CABEÇALHO ────────────────────────────────────────────────
+  doc.setFillColor(26, 26, 26);
+  doc.rect(0, 0, 210, 35, 'F');
+  doc.setFillColor(...bronze);
+  doc.rect(0, 35, 210, 1, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(...light);
+  doc.text('NEUR LEDER', margin, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(...bronze);
+  doc.text('Relatório de Análise de Candidato', margin, 26);
+  doc.setFontSize(8);
+  doc.setTextColor(120, 100, 80);
+  doc.text(new Date().toLocaleDateString('pt-BR'), pageW - margin, 26, { align: 'right' });
+  y = 45;
+
+  // ── VAGA E SCORE ────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...dark);
+  doc.text(cargo, margin, y); y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...gray);
+
+  // Score
+  var scoreClr = scoreColor(r.score);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(32);
+  doc.setTextColor(...scoreClr);
+  doc.text(r.score + '%', margin, y + 10);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...gray);
+  doc.text(r.classificacao, margin + 22, y + 10);
+  y += 18;
+
+  // ── RESUMO ───────────────────────────────────────────────────
+  sectionTitle('Resumo Executivo');
+  text(r.resumo, 10, dark, false, 0);
+  y += 3;
+
+  // ── DISC ─────────────────────────────────────────────────────
+  if (r.disc_analise && r.disc_analise !== 'Não informado') {
+    sectionTitle('Perfil DISC');
+    text(r.disc_analise, 10, dark, false, 0);
+    y += 3;
+  }
+
+  // ── CRITÉRIOS ────────────────────────────────────────────────
+  sectionTitle('Análise por Critério');
+  (r.criterios||[]).forEach(function(c) {
+    checkPage(12);
+    var clr = nivelColor(c.nivel);
+    badge(c.nivel, margin, y, clr);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...dark);
+    doc.text(c.nome, margin + doc.getTextWidth(c.nivel) + 10, y);
+    y += 5;
+    text(c.evidencia, 9, gray, false, 3);
+    y += 1;
+  });
+  y += 2;
+
+  // ── REQUISITOS ───────────────────────────────────────────────
+  sectionTitle('Requisitos Obrigatórios');
+  (r.requisitos||[]).forEach(function(req) {
+    checkPage(12);
+    var clr = atendeColor(req.atende);
+    badge(req.atende, margin, y, clr);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...dark);
+    doc.text(req.nome, margin + doc.getTextWidth(req.atende) + 10, y);
+    y += 5;
+    text(req.evidencia, 9, gray, false, 3);
+    y += 1;
+  });
+  y += 2;
+
+  // ── PONTOS FORTES ────────────────────────────────────────────
+  sectionTitle('Pontos Fortes');
+  (r.pontos_fortes||[]).forEach(function(p) {
+    checkPage(8);
+    doc.setFillColor(15, 42, 21);
+    doc.circle(margin + 2, y - 1.5, 1.5, 'F');
+    text(p, 9, dark, false, 6);
+  });
+  y += 2;
+
+  // ── PONTOS DE ATENÇÃO ────────────────────────────────────────
+  sectionTitle('Pontos de Atenção');
+  (r.pontos_atencao||[]).forEach(function(p) {
+    checkPage(8);
+    doc.setFillColor(42, 15, 15);
+    doc.circle(margin + 2, y - 1.5, 1.5, 'F');
+    text(p, 9, dark, false, 6);
+  });
+  y += 2;
+
+  // ── PERGUNTAS ────────────────────────────────────────────────
+  sectionTitle('Perguntas de Aprofundamento');
+  (r.perguntas||[]).forEach(function(q, i) {
+    checkPage(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...bronze);
+    doc.text((i+1) + '.', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...dark);
+    var lines = doc.splitTextToSize(q, contentW - 8);
+    doc.text(lines, margin + 6, y);
+    y += lines.length * 5 + 2;
+  });
+  y += 2;
+
+  // ── RECOMENDAÇÃO ─────────────────────────────────────────────
+  sectionTitle('Recomendação Final');
+  var recClr = r.recomendacao==='Avançar para a próxima etapa'?[15,110,86]:r.recomendacao==='Avançar com ressalvas'?[24,95,165]:r.recomendacao==='Manter em banco de talentos'?[133,79,11]:[160,64,64];
+  checkPage(20);
+  doc.setFillColor(...recClr);
+  doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text(r.recomendacao, pageW/2, y + 6.5, { align: 'center' });
+  y += 15;
+  text(r.justificativa, 10, gray, false, 0);
+  y += 4;
+  doc.setFontSize(8);
+  doc.setTextColor(...gray);
+  text('Cálculo: ' + r.calculo, 8, gray, false, 0);
+
+  // ── RODAPÉ ───────────────────────────────────────────────────
+  var totalPages = doc.internal.getNumberOfPages();
+  for (var i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(26, 26, 26);
+    doc.rect(0, 287, 210, 10, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...bronze);
+    doc.text('NEUR LEDER — Sistema de Recrutamento', margin, 293);
+    doc.setTextColor(100, 80, 60);
+    doc.text('Página ' + i + ' de ' + totalPages, pageW - margin, 293, { align: 'right' });
+  }
+
+  doc.save('analise-candidato-' + cargo.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.pdf');
 }
 
 function novaAnalise() {
